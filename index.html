@@ -161,18 +161,40 @@
     return {open: this.open}
   };
   ////////////////////////////////////////////////
-  function Bomb(tick, x) {
-    this.tick = tick
-    this.x = x
-    this.y = 0
+  var BOMBS_IN_COLUMN = {
+    0: 0,
+    1: 1,
+    2: 1,
+    3: 2,
+    4: 1,
+    5: 2,
+    6: 2,
+    7: 3,
+    8: 1,
+    9: 2,
+    10: 2,
+    11: 3,
+    12: 2,
+    13: 3,
+    14: 3,
+    15: 4,
+    16: 1,
+    17: 2,
+    18: 2,
+    19: 3,
+    20: 2,
+    21: 3,
+    22: 3,
+    23: 4,
+    24: 2,
+    25: 3,
+    26: 3,
+    27: 4,
+    28: 3,
+    29: 4,
+    30: 4,
+    31: 5
   }
-  Bomb.prototype.classes = function(tick) {
-    var h = {}
-    h["x"+this.x] = true
-    h["y"+this.y] = true
-    return h
-  };
-  ////////////////////////////////////////////////
   app.controller('AppController', ['$scope', function(scope){
     window.scope = scope
     scope.bridge = new Bridge()
@@ -184,7 +206,7 @@
       scope.gameOver = false
       scope.tank.initialize()
       scope.tankKilledUntil = -1
-      scope.bombs = []
+      scope.bombs = [0,0,0,0] // bitmask: 1 is the top, 16 is the bottom
     }
     scope.initialize()
     scope.keyDown = function(e) {
@@ -224,19 +246,12 @@
       }
     }
     scope.moveBombs = function(tick) {
-      for (var i = scope.bombs.length - 1; i >= 0; i--) {
-        var bomb = scope.bombs[i]
-        if (tick - bomb.tick >= 4) { // move bomb down
-          if (bomb.y <= 3) {
-            bomb.tick = tick
-            bomb.y++
-            if (bomb.y == 4 && bomb.x == scope.tank.x) { // kill tank
-              scope.killTank()
-            }
-          } else { // destroy bomb
-            scope.bombs.splice(i, 1)
-          }
-        }
+      var x = (tick % 4)
+      var bombBits = scope.bombs[x]
+      var old = bombBits
+      scope.bombs[x] = bombBits = (bombBits << 1) & 31
+      if ((bombBits & 16) && (x + 1 == scope.tank.x)) { // kill tank
+        scope.killTank()
       }
     }
     scope.checkTankWin = function(tick) {
@@ -246,22 +261,17 @@
       }
     }
     scope.bombAt = function(x, y) {
-      for (var i = scope.bombs.length - 1; i >= 0; i--) {
-        var bomb = scope.bombs[i]
-        if (bomb.x == x && bomb.y == y) {
-          return true
-        }
-      }
-      return false
+      return (scope.bombs[x - 1] & (1 << y)) > 0
     }
     scope.addRandomBombs = function(tick) {
-      var x = (tick % 4) + 1
-      var probability = Math.max(0.1, (5-scope.bombs.length)*0.1)
-      if (Math.random() < probability && !scope.bombAt(x, 0)) {
-        scope.bombs.push(new Bomb(scope.tick, x))
+      var x = (tick % 4)
+      var bombsInFirstRow = (scope.bombs[0] & 1) + (scope.bombs[1] & 1) + (scope.bombs[2] & 1) + (scope.bombs[3] & 1)
+      var bombsInColumn = BOMBS_IN_COLUMN[scope.bombs[x]]
+      if (Math.random() < 0.3 && !scope.bombAt(x + 1, 0) && bombsInFirstRow < 2 && bombsInColumn < 2) {
+        scope.bombs[x] |= 1
       }
     }
-    window.setInterval(function(){scope.$apply(function(){
+    scope.interval = window.setInterval(function(){scope.$apply(function(){
       if (scope.tankKilledUntil >= new Date().getTime()) {
 
       } else if (scope.tank.dead) {
@@ -308,7 +318,32 @@
   </div>
   <div class="tank" ng-class="tank.classes(tick)"></div>
   <div class="bridge" ng-class="bridge.classes(tick)"></div>
-  <div ng-repeat="bomb in bombs" class="bomb" ng-class="bomb.classes(tick)"></div>
+
+  <div ng-if="bombAt(1, 0)" class="bomb x1 y0"></div>
+  <div ng-if="bombAt(2, 0)" class="bomb x2 y0"></div>
+  <div ng-if="bombAt(3, 0)" class="bomb x3 y0"></div>
+  <div ng-if="bombAt(4, 0)" class="bomb x4 y0"></div>
+
+  <div ng-if="bombAt(1, 1)" class="bomb x1 y1"></div>
+  <div ng-if="bombAt(2, 1)" class="bomb x2 y1"></div>
+  <div ng-if="bombAt(3, 1)" class="bomb x3 y1"></div>
+  <div ng-if="bombAt(4, 1)" class="bomb x4 y1"></div>
+
+  <div ng-if="bombAt(1, 2)" class="bomb x1 y2"></div>
+  <div ng-if="bombAt(2, 2)" class="bomb x2 y2"></div>
+  <div ng-if="bombAt(3, 2)" class="bomb x3 y2"></div>
+  <div ng-if="bombAt(4, 2)" class="bomb x4 y2"></div>
+
+  <div ng-if="bombAt(1, 3)" class="bomb x1 y3"></div>
+  <div ng-if="bombAt(2, 3)" class="bomb x2 y3"></div>
+  <div ng-if="bombAt(3, 3)" class="bomb x3 y3"></div>
+  <div ng-if="bombAt(4, 3)" class="bomb x4 y3"></div>
+
+  <div ng-if="bombAt(1, 4)" class="bomb x1 y4"></div>
+  <div ng-if="bombAt(2, 4)" class="bomb x2 y4"></div>
+  <div ng-if="bombAt(3, 4)" class="bomb x3 y4"></div>
+  <div ng-if="bombAt(4, 4)" class="bomb x4 y4"></div>
+
   <div class="left-button" my-touchstart="leftClick()"></div>
   <div class="right-button" my-touchstart="rightClick()"></div>
   <div ng-if="gameOver" class="gameOver">
