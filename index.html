@@ -1,0 +1,273 @@
+<!doctype HTML>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+  <title>Plane and Tank</title>
+  <script src="angular.min.js"></script>
+  <script src="angular-touch.min.js"></script>
+  <style type="text/css">
+    * { box-sizing: border-box; -webkit-user-select: none; /* Chrome/Safari */ -moz-user-select: none; /* Firefox */ -ms-user-select: none; /* IE10+ */ /* Rules below not implemented in browsers yet */ -o-user-select: none; user-select: none;}
+    body, html { margin: 0; height: 100%; }
+    .score-wrapper { position: absolute; }
+    .score { display: inline-block; font-size: 40px; width: 300px; height: 40px; text-align: right; }
+    .lives { display: inline-block; font-size: 20px; height: 40px; margin-left: 20px; }
+    .tank { position: absolute; top: 400px; width: 100px; height: 60px; background-image: url('tank100.png'); background-repeat: no-repeat; background-position-y: -20px;}
+    .tank.dead { top: 500px; transform: scaleY(-1); }
+    .tank.x0 { left: 50px; }
+    .tank.x1 { left: 150px; }
+    .tank.x2 { left: 250px; }
+    .tank.x3 { left: 350px; }
+    .tank.x4 { left: 450px; }
+    .tank.x5 { left: 650px; }
+    .bridge { position: absolute; top: 460px; left: 550px; width: 100px; height: 10px; background: black; transform: rotate(-45deg); transform-origin: left; }
+    .bridge.open { transform: rotate(0deg); }
+    .bomb { position: absolute;; width: 100px; height: 60px; background-image: url('bomb.png'); background-repeat: no-repeat; background-position: center; }
+    .bomb.x1 { left: 150px; }
+    .bomb.x2 { left: 250px; }
+    .bomb.x3 { left: 350px; }
+    .bomb.x4 { left: 450px; }
+    .bomb.y0 { top: 100px; }
+    .bomb.y1 { top: 160px; }
+    .bomb.y2 { top: 220px; }
+    .bomb.y3 { top: 280px; }
+    .bomb.y4 { top: 340px; }
+    .top1 { position: absolute; top: 100px; left: 0px; width: 150px; height: 250px; background-image: url('brick copy.png'); }
+    .road1 { position: absolute; top: 460px; left: 0px; width: 150px; height: 100px; background-image: url('brick copy.png'); }
+    .top2 { position: absolute; top: 100px; left: 650px; width: 150px; height: 250px; background-image: url('brick copy.png'); }
+    .road2 { position: absolute; top: 460px; left: 650px; width: 150px; height: 100px; background-image: url('brick copy.png'); }
+    .static-bridge { position: absolute; top: 460px; left: 150px; width: 400px; height: 100px; background-image: url('static-bridge.png'); background-repeat: repeat-x; background-position-y: -16px;}
+    .gameOver { position: absolute; z-index: 1; }
+    .gameOver button { font-size: 40px; }
+
+    /* Smartphones (landscape) ----------- */
+    @media only screen
+    and (min-width : 401px) {
+      .left-button { display: none; }
+      .right-button { display: none; }
+    }
+
+    /* Smartphones (portrait) ----------- */
+    @media only screen
+    and (max-width : 400px) {
+      .left-button  { display: block; position: absolute; top: 600px; left: 0px; width: 300px; height: 300px; background: #ccc; }
+      .right-button { display: block; position: absolute; top: 600px; left: 500px; width: 300px; height: 300px; background: #ccc; }
+    }
+  </style>
+  <script type="text/javascript">
+  app = angular.module('myApp', ['ngTouch'])
+  app.directive('shortcut', function() {
+    return {
+      restrict: 'E',
+      replace: true,
+      scope: true,
+      link: function postLink(scope, iElement, iAttrs){
+        document.addEventListener('keydown', function(e){
+          scope.$apply(scope.keyDown(e))
+        })
+        document.addEventListener('keyup', function(e){
+          scope.$apply(scope.keyUp(e))
+        })
+      }
+    }
+  })
+  ////////////////////////////////////////////////
+  function Tank(bridge) {
+    this.bridge = bridge
+    this.initialize()
+  }
+  Tank.prototype.initialize = function() {
+    this.x = 0
+    this.dead = false
+    this.moveOutAt = new Date().getTime() + 5000 // can stay under the hill for 5 seconds
+  };
+  Tank.prototype.classes = function(tick) {
+    var h = {dead: this.dead}
+    h["x"+this.x] = true
+    return h
+  };
+  Tank.prototype.left = function() {
+    if (this.dead || this.disabledUntil >= new Date().getTime()) {
+      return
+    }
+    if (this.x >= 2) {
+      this.x--
+    }
+  };
+  Tank.prototype.right = function() {
+    if (this.dead || this.disabledUntil >= new Date().getTime()) {
+      return
+    }
+    if (this.x <= 3 || (this.x == 4 && this.bridge.open)) {
+      this.x++
+      if (this.x == 5) {
+        this.disabledUntil = new Date().getTime() + 200 // disable input for 200 msec
+      }
+    }
+  };
+  ////////////////////////////////////////////////
+  function Bridge() {
+    this.open = false
+  }
+  Bridge.prototype.classes = function(tick) {
+    this.open = (tick % 30) >= 20 // open 2.5 seconds every 7.5 seconds
+    return {open: this.open}
+  };
+  ////////////////////////////////////////////////
+  function Bomb(tick, x) {
+    this.tick = tick
+    this.x = x
+    this.y = 0
+  }
+  Bomb.prototype.classes = function(tick) {
+    var h = {}
+    h["x"+this.x] = true
+    h["y"+this.y] = true
+    return h
+  };
+  ////////////////////////////////////////////////
+  app.controller('AppController', ['$scope', function(scope){
+    window.scope = scope
+    scope.bridge = new Bridge()
+    scope.tank = new Tank(scope.bridge)
+    scope.initialize = function() {
+      scope.tick = 0
+      scope.score = 0
+      scope.lives = 4
+      scope.gameOver = false
+      scope.tank.initialize()
+      scope.tankKilledUntil = -1
+      scope.bombs = []
+    }
+    scope.initialize()
+    scope.keyDown = function(e) {
+      if (scope.keyCode) {
+        return
+      }
+      scope.keyCode = e.which
+      switch (scope.keyCode) {
+        case 83: // s
+        case 37: // left arrow
+          scope.leftClick()
+          break
+        case 75: // k
+        case 39: // right arrow
+          scope.rightClick()
+          break
+      }
+    }
+    scope.leftClick = function(){
+      scope.tank.left()
+      scope.checkTankKilled()
+    }
+    scope.rightClick = function(){
+      scope.tank.right()
+      scope.checkTankKilled()
+    }
+    scope.keyUp = function(e) {
+      scope.keyCode = undefined
+    }
+    scope.killTank = function() {
+      scope.tank.dead = true
+      scope.tankKilledUntil = new Date().getTime() + 3000 // 3 seconds animation
+    }
+    scope.checkTankKilled = function() {
+      if (!scope.tank.dead && scope.bombAt(scope.tank.x, 4)) {
+        scope.killTank()
+      }
+    }
+    scope.moveBombs = function(tick) {
+      for (var i = scope.bombs.length - 1; i >= 0; i--) {
+        var bomb = scope.bombs[i]
+        if (tick - bomb.tick >= 4) { // move bomb down
+          if (bomb.y <= 3) {
+            bomb.tick = tick
+            bomb.y++
+            if (bomb.y == 4 && bomb.x == scope.tank.x) { // kill tank
+              scope.killTank()
+            }
+          } else { // destroy bomb
+            scope.bombs.splice(i, 1)
+          }
+        }
+      }
+    }
+    scope.checkTankWin = function(tick) {
+      if (scope.tank.x >= 5) {
+        scope.score += 10
+        scope.tank.initialize()
+      }
+    }
+    scope.bombAt = function(x, y) {
+      for (var i = scope.bombs.length - 1; i >= 0; i--) {
+        var bomb = scope.bombs[i]
+        if (bomb.x == x && bomb.y == y) {
+          return true
+        }
+      }
+      return false
+    }
+    scope.addRandomBombs = function(tick) {
+      var x = (tick % 4) + 1
+      var probability = Math.max(0.1, (5-scope.bombs.length)*0.1)
+      if (Math.random() < probability && !scope.bombAt(x, 0)) {
+        scope.bombs.push(new Bomb(scope.tick, x))
+      }
+    }
+    window.setInterval(function(){scope.$apply(function(){
+      if (scope.tankKilledUntil >= new Date().getTime()) {
+
+      } else if (scope.tank.dead) {
+        if (scope.lives > 0) {
+          scope.lives--
+          if (scope.lives <= 0) {
+            scope.gameOver = true
+          } else {
+            scope.tank.initialize()
+          }
+        }
+      } else {
+        scope.tick++
+        if (scope.tank.x == 0 && scope.tank.moveOutAt < new Date().getTime()) {
+          scope.tank.moveOutAt = -1
+          scope.tank.right()
+        }
+        scope.moveBombs(scope.tick)
+        scope.addRandomBombs(scope.tick)
+        scope.checkTankWin(scope.tick)
+        if (scope.tick % 20 == 0) {
+          scope.score++
+        }
+      }
+    })}, 250)
+  }])
+  </script>
+</head>
+<body ng-controller="AppController">
+  <shortcut></shortcut>
+  <!-- <div style="z-index: 1;position: absolute;">{{keyCode}}</div> -->
+  <div class="score-wrapper">
+    <nobr>
+      <div class="score">Score: {{score}}</div>
+      <div class="lives">Lives: {{lives}}</div>
+    </nobr>
+  </div>
+  <div class="static">
+    <div class="top1"></div>
+    <div class="road1"></div>
+    <div class="static-bridge"></div>
+    <div class="top2"></div>
+    <div class="road2"></div>
+  </div>
+  <div class="tank" ng-class="tank.classes(tick)"></div>
+  <div class="bridge" ng-class="bridge.classes(tick)"></div>
+  <div ng-repeat="bomb in bombs" class="bomb" ng-class="bomb.classes(tick)"></div>
+  <div class="left-button" ng-click="leftClick()"></div>
+  <div class="right-button" ng-click="rightClick()"></div>
+  <div ng-if="gameOver" class="gameOver">
+    <button ng-click="initialize()">Restart</button>
+  </div>
+  <script type="text/javascript">
+  angular.bootstrap(document, ['myApp'])
+  </script>
+</body>
+</html>
