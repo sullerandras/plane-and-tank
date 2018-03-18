@@ -1,0 +1,15 @@
+CACHE MANIFEST
+# Version 2018-03-18 12:19
+
+CACHE:
+./angular.min.js
+./angular-touch.min.js
+./bomb.png
+./bomb100.png
+./brick.png
+./static-bridge.png
+./static-bridge100.png
+./tank.png
+./tank100.png
+./wave.png
+./wave100.png
