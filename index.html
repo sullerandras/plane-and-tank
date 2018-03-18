@@ -87,14 +87,36 @@
       scope: true,
       link: function postLink(scope, iElement, iAttrs){
         document.addEventListener('keydown', function(e){
-          scope.$apply(scope.keyDown(e))
+          scope.$apply(function(){
+            scope.keyDown(e)
+          })
         })
         document.addEventListener('keyup', function(e){
-          scope.$apply(scope.keyUp(e))
+          scope.$apply(function(){
+            scope.keyUp(e)
+          })
         })
       }
     }
   })
+  app.directive('myTouchstart', [function() {
+    return function(scope, element, attr) {
+      element.on('touchstart', function(event) {
+        scope.$apply(function() {
+          scope.$eval(attr.myTouchstart);
+        });
+      });
+    };
+  }])
+  app.directive('myTouchend', [function() {
+    return function(scope, element, attr) {
+      element.on('touchend', function(event) {
+        scope.$apply(function() {
+          scope.$eval(attr.myTouchend);
+        });
+      });
+    };
+  }])
   ////////////////////////////////////////////////
   function Tank(bridge) {
     this.bridge = bridge
@@ -286,8 +308,8 @@
   <div class="tank" ng-class="tank.classes(tick)"></div>
   <div class="bridge" ng-class="bridge.classes(tick)"></div>
   <div ng-repeat="bomb in bombs" class="bomb" ng-class="bomb.classes(tick)"></div>
-  <div class="left-button" ng-click="leftClick()"></div>
-  <div class="right-button" ng-click="rightClick()"></div>
+  <div class="left-button" my-touchstart="leftClick()"></div>
+  <div class="right-button" my-touchstart="rightClick()"></div>
   <div ng-if="gameOver" class="gameOver">
     <button ng-click="initialize()">Restart</button>
   </div>
